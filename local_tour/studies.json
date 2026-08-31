@@ -1,0 +1,80 @@
+[
+ {
+  "date": "2026-07-31",
+  "state": "analysee",
+  "title": "Braignak — observer Utilite rentabilite et carriere de la tour de controle",
+  "summary": "=== OBSERVE PAR DEEPSEEK (lecture seule) === Tours : 2 · appels d'outils : 1 · jetons : 25520 entree, 5681 sortie Aucun fichier ecrit (lecture seule, voulu)."
+ },
+ {
+  "date": "2026-07-31",
+  "state": "analysee",
+  "title": "Braignak — observer Les autres solo-builders et comment ils orchestrent leurs agents IA",
+  "summary": "On a cherché l'application à étudier, mais elle n'est pas là. On ne peut pas faire le travail sans elle."
+ },
+ {
+  "date": "2026-07-31",
+  "state": "analysee",
+  "title": "Les autres solo-builders : comment ils orchestrent leurs agents — comparatif avec la tour",
+  "summary": "On a cherché le travail à faire, mais il n'y avait rien dans le dossier."
+ },
+ {
+  "date": "2026-07-31",
+  "state": "analysee",
+  "title": "Le Coffre aux outils des agents : chaque geste automatisable devient un outil",
+  "summary": "On a fabriqué une boîte à outils pour les agents, mais on n'a pas encore trouvé le code pour la remplir."
+ },
+ {
+  "date": "2026-07-30",
+  "state": "analysee",
+  "title": "Un compte par agent : son accueil, ses droits, et il sait interroger son instance",
+  "summary": "On a donné à chaque agent son propre espace de travail, mais on a décidé de n'utiliser qu'un seul compte pour lire les données, pas dix-sept."
+ },
+ {
+  "date": "2026-07-30",
+  "state": "observation",
+  "title": "Valeur/rentabilite pour l individu (Odoo+IA) + comparatif concurrents",
+  "summary": "On a fabriqué un coffre-fort pour tes affaires, et un robot qui construit tes jouets tout seul."
+ },
+ {
+  "date": "2026-07-30",
+  "state": "observation",
+  "title": "Rentabilite recalculee : deepseek-agent construit pour quasi rien",
+  "summary": "On a refait les calculs pour savoir combien coûte une appli, et c’est presque gratuit."
+ },
+ {
+  "date": "2026-07-30",
+  "state": "prototype",
+  "title": "Construire sans Claude : deepseek-agent (existe) + Kimi 3 (a cabler)",
+  "summary": "On a écrit des papiers et des petits programmes pour mieux comprendre, mais on n’a pas encore fini."
+ },
+ {
+  "date": "2026-07-30",
+  "state": "analysee",
+  "title": "Compter le travail d orchestration (Patrick + Raphael) dans les niveaux",
+  "summary": "On a ajouté une compétence pour Patrick, basée sur ses vraies décisions et ordres."
+ },
+ {
+  "date": "2026-07-30",
+  "state": "prototype",
+  "title": "Module de gestion des competences/outils des agents",
+  "summary": "On a fabriqué un petit jeu pour vérifier quels outils chaque agent peut utiliser, et on peut en donner ou en retirer à tout moment."
+ },
+ {
+  "date": "2026-07-30",
+  "state": "prototype",
+  "title": "ERP collaboratif -> prive par defaut (PRP) + cloisonnement des acces agents",
+  "summary": "=== CONSTRUIT PAR DEEPSEEK (moteur autonome) === Tours : 27 · appels d'outils : 30 · jetons : 766390 entree, 28188 sortie Fichiers ecrits : CIRCUIT.md, JOURNAL-ETAPES.md,…"
+ },
+ {
+  "date": "2026-07-29",
+  "state": "analysee",
+  "title": "Console d'agents d'Anthropic (Claude Managed Agents)",
+  "summary": "On a comparé nos outils à ceux d'Anthropic, et on a vu ce qu'ils font mieux que nous."
+ },
+ {
+  "date": "2026-07-29",
+  "state": "analysee",
+  "title": "Quels outils orchestrent l'automatisation comme nous ? (n8n, Zapier, Make, Airflow, Temporal…)",
+  "summary": "On a regardé ce que font les autres outils, et on a décidé de faire notre propre système de reprise automatique."
+ }
+]

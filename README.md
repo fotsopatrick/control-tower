@@ -35,7 +35,8 @@ the Gemini fallback path and is not required by the demo.
 ## Technology
 
 - **Model**: Google Gemini via the `google-genai` SDK (the router tries
-  `gemini-2.5-flash` first; the model list is configurable with `GEMINI_MODELS`)
+  `gemini-3.5-flash` first — the mandatory minimum for this hackathon — then
+  falls back to older flash models; the list is configurable with `GEMINI_MODELS`)
 - **Serving**: FastAPI on Google Cloud Run
 - **Verification**: an independent oracle program, no model involved
 
@@ -44,6 +45,42 @@ the Gemini fallback path and is not required by the demo.
 See [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
 
 
+
+
+## Delegation to specialised sub-agents
+
+A fleet is not one agent wearing many hats. Each agent in this tower has a
+written specification, a declared scope, and an engine — **9 of the 21 are bound
+to no model at all**. When a request is broader than one capability, the control
+plane splits it and hands each piece to the agent whose specification covers it.
+
+```bash
+curl -s -X POST $S/delegate -H 'Content-Type: application/json' -d '{
+  "request": "run the regression tests and audit the secrets then review the wording and publish the article"
+}'
+```
+
+**You must see** the request cut into **4 pieces**, handed to **4 different
+agents**, with this outcome:
+
+| agent | role | engine | piece | outcome |
+|---|---|---|---|---|
+| Jimmy | the test bench | none | run the regression tests | done |
+| Victor | security | none | audit the secrets | done |
+| Lois | review | none | review the wording | done |
+| Chloe | daily assistant | smolagents | publish the article | **refused** |
+
+`handled_without_any_model: 3` — three of the four pieces never touched a model.
+
+And the refusal names its own cause:
+`"Chloe may not publish: its specification grants may_publish = false"`.
+
+**Separation of concerns is enforced in code, not suggested in a prompt.** An
+agent is never handed work outside its declared scope, and a sub-agent that
+fails marks only its own piece — the remaining pieces continue. That is what
+failure-tolerant routing means when a worker loops or returns nonsense.
+
+Press **Delegate to sub-agents** on `$S/demo` to watch it happen.
 
 ## Asynchronous batch work — where the saving becomes obvious
 
@@ -116,6 +153,112 @@ Deploy to Cloud Run:
 gcloud run deploy control-tower --source . --region europe-west9 \
   --allow-unauthenticated --set-env-vars GOOGLE_API_KEY=<key>
 ```
+
+
+## Reproducible testing — type this, you must see that
+
+Every command below runs against the live service. No credentials needed.
+`$S` is the deployed URL:
+
+```bash
+S=https://control-tower-491595433989.europe-west9.run.app
+```
+
+### 1. A known capability costs nothing
+
+```bash
+curl -s -X POST $S/mcp/tour -H 'Content-Type: application/json' \
+     -d '{"name":"read_carte"}'
+```
+
+**You must see** `"decision":"MATCH"`, `"model_calls":0`, and a summary of the
+living map beginning `LIVING MAP — surveyed`, listing **478 entries across 9
+zones**. If `model_calls` is anything but `0`, the central claim of this project
+is false.
+
+### 2. The guardrail refuses, and says why
+
+```bash
+curl -s -X POST $S/mcp/tour -H 'Content-Type: application/json' \
+     -d '{"name":"create_task"}'
+```
+
+**You must see** `"decision":"REFUSED"` and
+`"reason":"write capability requires args.confirm = true"`.
+
+```bash
+curl -s -X POST $S/mcp/tour -H 'Content-Type: application/json' \
+     -d '{"name":"drop_database"}'
+```
+
+**You must see** `"decision":"REFUSED"` and `"on the deny list"`.
+
+### 3. An unknown capability reaches Gemini 3.5
+
+```bash
+curl -s -X POST $S/mcp/tour -H 'Content-Type: application/json' \
+     -d '{"name":"send_invoice_to_client","args":{"client":"ACME"}}'
+```
+
+**You must see** `"decision":"NO_MATCH"`, `"model":"vertex/gemini-3.5-flash"`,
+and `"model_calls":1`. Takes about 6 seconds — that is the model thinking.
+
+### 4. The independent oracle
+
+```bash
+curl -s -X POST $S/verify -H 'Content-Type: application/json' -d '{"input":17}'
+```
+
+**You must see** `{"input":17,"expected":712,"model_calls":0}`. The value is
+recomputed by a separate program (`local_tour/independent_oracle.py`); it is
+never read from a stored answer.
+
+### 5. The saving, at scale, in the background
+
+```bash
+curl -s -X POST $S/batch -H 'Content-Type: application/json' \
+     -d "{\"requests\":[$(for i in $(seq 1 190); do printf '{"name":"read_carte"},'; done)$(for i in $(seq 1 9); do printf '{"name":"unknown_%d"},' $i; done){"name":"unknown_10"}]}"
+```
+
+**You must see** a `job_id` returned in well under a second — the caller does
+not wait. Then poll it:
+
+```bash
+curl -s $S/batch/<job_id>
+```
+
+**You must see** `state: finished`, `deterministic: 190`, `llm: 10`,
+`model_calls: 10`, and `share_without_model` around **95**.
+Ten model calls for two hundred requests.
+
+Or press **Hand over 200 requests** on `$S/demo` and watch the counter climb.
+
+### 6. Locally, without any network
+
+```bash
+python3 run_tests.py        # reasoner vs independent oracle, 5 inputs
+python3 sgrm_core.py        # full arithmetic trace, exits non-zero on disagreement
+python3 audit_sgrm_hackathon.py .   # checks this README against the files on disk
+```
+
+**You must see** `5 input(s) checked, 0 failure(s)`, then `verdict = AGREE`,
+then `11 PASS / 0 WARN / 0 FAIL` and `VERDICT : CONFORME`.
+
+That last script is deliberately hostile to its own repository: it fails the
+build when a claim made here is not corroborated by a file. It has already
+caught a fabricated Gemini integration in an earlier version of this project.
+
+### 7. Same answers, two different models
+
+```bash
+python3 preuve_deux_modeles.py $S http://localhost:8090
+```
+
+Requires a second router whose fallback is a self-hosted model
+(`./lancer_routeur_local.sh` with `LOCAL_MODEL_URL` pointing at your Ollama).
+**You must see** `0 mismatch(es) on the deterministic path` — every routing
+decision, guardrail verdict and computed value identical, whichever model backs
+the fallback.
 
 ## What the demo shows
 

@@ -1,0 +1,20 @@
+{
+ "modules_installed": 83,
+ "data_models": 39,
+ "memory_rows": 26456,
+ "circuit_runs": 1580,
+ "circuit_steps_passed": 2912,
+ "circuit_templates": 153,
+ "circuit_gates": 493,
+ "agent_events": 2106,
+ "agent_achievements": 2861,
+ "skills_defined": 77,
+ "bot_visits_logged": 1170,
+ "bus_messages": 1293,
+ "backups": 389,
+ "tools_catalogued": 414,
+ "oldest_circuit_run": "2026-07-31",
+ "newest_circuit_run": "2026-08-31",
+ "snapshot_taken": "2026-08-31",
+ "source": "production database of the Control Tower, read-only export"
+}

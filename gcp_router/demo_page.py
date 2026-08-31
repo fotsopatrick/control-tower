@@ -22,7 +22,18 @@ font:inherit;cursor:pointer;transition:.12s}
 button:hover{border-color:var(--blue);background:#1c2333}
 button b{display:block;color:var(--white);margin-bottom:2px}
 button span{color:var(--dim);font-size:13px}
-#run{background:#1f6feb;border-color:#1f6feb;color:#fff;text-align:center;margin-bottom:18px}
+#run{background:#1f6feb;border-color:#1f6feb;color:#fff;text-align:center;margin-bottom:10px}
+#deleg{background:#0e7490;border-color:#0e7490;color:#fff;text-align:center;margin-bottom:10px}
+#deleg b,#deleg span{color:#fff}
+#batch{background:#7c3aed;border-color:#7c3aed;color:#fff;text-align:center;margin-bottom:18px}
+#batch b,#batch span{color:#fff}
+#bwrap{display:none;border:1px solid var(--line);border-radius:8px;padding:16px;
+margin-bottom:16px;background:var(--panel)}
+#bbar{height:10px;background:#0d1117;border-radius:6px;overflow:hidden;margin:10px 0}
+#bfill{height:100%;width:0;background:var(--green);transition:width .3s}
+#bnums{display:flex;gap:24px;flex-wrap:wrap;margin-top:10px}
+#bnums div u{display:block;text-decoration:none;font-size:24px;color:var(--white)}
+#bnums div s{display:block;text-decoration:none;color:var(--dim);font-size:12px}
 #run b{color:#fff}
 #out{padding:20px 26px;overflow:auto}
 .card{border:1px solid var(--line);border-left-width:4px;border-radius:8px;
@@ -51,6 +62,8 @@ border-bottom:1px solid var(--line);margin-bottom:16px}
 <main>
 <div id=steps>
 <button id=run><b>&#9654; Run the whole flight</b></button>
+<button id=deleg><b>&#128101; Delegate to sub-agents</b><span>one request, split across the fleet</span></button>
+<button id=batch><b>&#9889; Hand over 200 requests</b><span>asynchronous &mdash; watch the saving</span></button>
 <button data-k=read_carte><b>1 · read_carte</b><span>known capability</span></button>
 <button data-k=create_task><b>2 · create_task</b><span>a write, unconfirmed</span></button>
 <button data-k=create_task data-c=1><b>3 · create_task + confirm</b><span>a write, confirmed</span></button>
@@ -68,6 +81,16 @@ border-bottom:1px solid var(--line);margin-bottom:16px}
 <div class="num g"><u id=tDet>—</u><s>deterministic answer</s></div>
 <div class="num y"><u id=tLlm>—</u><s>model answer</s></div>
 <div class="num"><u id=ratio>—</u><s>speed difference</s></div>
+</div></div>
+<div id=bwrap>
+<div class=meta id=bhead>ASYNCHRONOUS BATCH</div>
+<div id=bbar><div id=bfill></div></div>
+<div id=bnums>
+<div><u id=bDone>0</u><s>done / total</s></div>
+<div><u id=bDet style="color:var(--green)">0</u><s>circuit &middot; 0 model calls</s></div>
+<div><u id=bRef style="color:var(--red)">0</u><s>refused</s></div>
+<div><u id=bLlm style="color:var(--yellow)">0</u><s>escalated to Gemini</s></div>
+<div><u id=bSave>&mdash;</u><s>model calls avoided</s></div>
 </div></div>
 <div id=log></div>
 </div>
@@ -127,6 +150,76 @@ document.getElementById('run').onclick=async e=>{
   await step('send_invoice_to_client',{client:'ACME'}); await wait(900);
   await oracle();
   b.disabled=false;
+};
+
+document.getElementById('deleg').onclick=async e=>{
+  const b=e.currentTarget; b.disabled=true; log.innerHTML='';
+  const q='run the regression tests and audit the secrets then review the '+
+          'wording and publish the article';
+  card('INFO','one request for the whole fleet',q,'POST /delegate');
+  const [r]=await call('/delegate',{request:q});
+  for(const t of r.tasks){
+    card(t.state==='refused'?'REFUSED':'MATCH',
+      t.agent+'  \u00b7  '+t.role,
+      ['piece  : '+t.piece,
+       'engine : '+t.engine,
+       'state  : '+t.state,
+       t.reason?('reason : '+t.reason):''].filter(Boolean)
+       .join(String.fromCharCode(10)),
+      t.needs_model?'this agent uses a model':'no model at all');
+    await new Promise(x=>setTimeout(x,700));
+  }
+  card('INFO','delegation summary',
+    ['pieces                    : '+r.pieces,
+     'sub-agents used           : '+r.sub_agents_used.join(', '),
+     'completed                 : '+r.completed,
+     'refused by specification  : '+r.refused_by_specification,
+     'handled without any model : '+r.handled_without_any_model,
+     'model calls needed        : '+r.model_calls_needed
+    ].join(String.fromCharCode(10)),
+    'separation of concerns enforced in code, not in a prompt');
+  b.disabled=false;
+};
+document.getElementById('batch').onclick=async e=>{
+  const b=e.currentTarget; b.disabled=true;
+  const W=['securite','agent','circuit','volume','conteneur','moteur','page','outil'];
+  const reqs=[];
+  for(let i=0;i<200;i++){
+    const m=i%20;
+    if(m<15) reqs.push({name:'read_carte',args:{argv:[W[i%8]]}});
+    else if(m<18) reqs.push({name:'create_task',args:{confirm:true}});
+    else if(m===18) reqs.push({name:'drop_database',args:{}});
+    else reqs.push({name:'unknown_capability_'+i,args:{client:'ACME'}});
+  }
+  bwrap.style.display='block';
+  const t0=performance.now();
+  const [j]=await call('/batch',{requests:reqs,label:'200 agent requests'});
+  const accept=Math.round(performance.now()-t0);
+  bhead.textContent='ASYNCHRONOUS BATCH \u00b7 job accepted in '+accept+
+    ' ms \u00b7 '+j.job_id+' \u00b7 the caller can walk away';
+  const tick=async()=>{
+    const s=await (await fetch('/batch/'+j.job_id)).json();
+    bDone.textContent=s.done+' / '+s.total;
+    bDet.textContent=s.deterministic; bRef.textContent=s.refused;
+    bLlm.textContent=s.llm;
+    bfill.style.width=Math.round(100*s.done/s.total)+'%';
+    const answered=s.deterministic+s.llm+s.refused;
+    if(answered) bSave.textContent=
+      Math.round(100*(1-s.model_calls/answered))+'%';
+    if(s.state==='finished'){
+      card('MATCH','batch finished \u2014 '+s.total+' requests',
+        ['model calls : '+s.model_calls+' instead of '+s.total,
+         'circuit     : '+s.deterministic,
+         'refused     : '+s.refused,
+         'Gemini      : '+s.llm,
+         'total time  : '+Math.round(s.finished_ms/1000)+' s'
+        ].join(String.fromCharCode(10)),
+        'a count, not a timing \u2014 it does not move with hardware or load');
+      b.disabled=false; await refresh(); return;
+    }
+    setTimeout(tick,1500);
+  };
+  tick();
 };
 refresh();
 </script>

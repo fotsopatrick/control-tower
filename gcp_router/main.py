@@ -19,17 +19,21 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from gcp_router import decisions as dec
+from gcp_router import delegation as dlg
 from gcp_router.demo_page import PAGE as DEMO_PAGE
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TOUR = ROOT / "local_tour"
 REGISTRY_PATH = TOUR / "registry.json"
+FLEET_PATH = TOUR / "fleet.json"
+PLATFORM_PATH = TOUR / "platform.json"
 
 # Candidate models, tried in order; the first one the key accepts is kept.
 MODEL_CANDIDATES = [
     m.strip() for m in os.environ.get(
         "GEMINI_MODELS",
-        "gemini-2.5-flash,gemini-flash-latest,gemini-2.0-flash,gemini-1.5-flash",
+        "gemini-3.5-flash,gemini-flash-latest,gemini-2.5-flash,gemini-2.0-flash",
     ).split(",") if m.strip()
 ]
 
@@ -329,6 +333,165 @@ async def verify(payload: dict):
             "model_calls": 0}
 
 
+def load_fleet():
+    with open(FLEET_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+class Mission(BaseModel):
+    request: str
+
+
+@app.post("/delegate")
+async def delegate(m: Mission):
+    """Split one request across the specialised sub-agents that can take it.
+
+    This is what the category asks for: not one agent with many prompts, but a
+    fleet where each member has a written specification, and where the routing
+    refuses to hand an agent work its own specification forbids.
+    """
+    if not m.request.strip():
+        raise HTTPException(status_code=400, detail="request is empty")
+    try:
+        return dlg.delegate(m.request)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/fleet")
+async def fleet():
+    """The agents this control plane governs, and what each is allowed to do.
+
+    A fleet is not one agent with many prompts. These are distinct agents with
+    written specifications, each bound to an engine -- including agents bound to
+    no model at all ("lecture-seule": deterministic code only). Any engine can
+    execute any specification, which is why the control plane, and not the
+    model, is what makes behaviour predictable.
+    """
+    agents = load_fleet()
+    engines = {}
+    for a in agents:
+        engines[a["engine"]] = engines.get(a["engine"], 0) + 1
+    no_model = sum(1 for a in agents if a["engine"] in ("lecture-seule", "none"))
+    return {
+        "agents": len(agents),
+        "engines": engines,
+        "agents_running_without_any_model": no_model,
+        "specification_chars_total": sum(a["spec_chars"] for a in agents),
+        "permissions": {
+            "may_publish": sum(1 for a in agents if a["may_publish"]),
+            "may_decide": sum(1 for a in agents if a["may_decide"]),
+            "may_modify": sum(1 for a in agents if a["may_modify"]),
+        },
+        "note": ("Engines are interchangeable: a specification written for one "
+                 "agent can be executed by Gemini, by a local model, or by no "
+                 "model at all. The guardrails and circuits do not change."),
+        "fleet": agents,
+    }
+
+
+@app.get("/platform")
+async def platform():
+    """What already existed before this hackathon, at its real size.
+
+    Disclosing pre-existing work is a rule of the competition. Disclosing it
+    honestly means giving its actual scale: a reader told "some experimental
+    components" pictures two draft files. These are the production numbers.
+    """
+    with open(PLATFORM_PATH, "r", encoding="utf-8") as f:
+        p = json.load(f)
+    return {
+        "what_a_director_asks": {
+            "control_gates_defined": p["circuit_gates"],
+            "gates_actually_passed": p["circuit_steps_passed"],
+            "governed_runs": p["circuit_runs"],
+            "period": "%s to %s" % (p["oldest_circuit_run"], p["newest_circuit_run"]),
+            "meaning": ("Every agent action crossed a gate that could refuse it, "
+                        "and every crossing is recorded. That is an audit trail, "
+                        "not a log."),
+        },
+        "platform_scale": {
+            "modules_installed": p["modules_installed"],
+            "data_models": p["data_models"],
+            "memory_rows": p["memory_rows"],
+            "circuit_templates": p["circuit_templates"],
+            "skills_defined": p["skills_defined"],
+            "tools_catalogued": p["tools_catalogued"],
+            "backups_taken": p["backups"],
+            "agent_events": p["agent_events"],
+        },
+        "pre_existing": ("The platform above was built before this hackathon and "
+                         "runs in production. It is disclosed, at its real size, "
+                         "because understating it would be as misleading as "
+                         "overstating it."),
+        "built_during_the_hackathon": [
+            "the deterministic front door (gcp_router/)",
+            "the Google GenAI fallback path, on Gemini 3.5 Flash via Vertex AI",
+            "the asynchronous batch endpoint",
+            "the independent-oracle wiring and /metrics observability",
+            "the Cloud Run deployment",
+            "the audit script that checks this repository against its own claims",
+        ],
+        "snapshot_taken": p["snapshot_taken"],
+        "source": p["source"],
+    }
+
+
+# --- the decisions desk: a human approves or refuses what an agent proposed ---
+class Login(BaseModel):
+    login: str
+    password: str
+
+
+class Session(BaseModel):
+    uid: int
+    cookie: str
+
+
+class Verdict(BaseModel):
+    session: Session
+    action: str
+    commentaire: str = ""
+
+
+@app.post("/api/login")
+async def decisions_login(body: Login):
+    try:
+        uid, cookie = dec.authenticate(body.login, body.password)
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    return {"uid": uid, "cookie": cookie}
+
+
+@app.post("/api/decisions")
+async def decisions_list(body: dict):
+    s = (body or {}).get("session") or {}
+    if not s.get("uid") or not s.get("cookie"):
+        raise HTTPException(status_code=401, detail="Not signed in.")
+    try:
+        return dec.list_decisions(s["uid"], s["cookie"])
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/decisions/{decision_id}/action")
+async def decisions_act(decision_id: int, body: Verdict):
+    try:
+        dec.decide(body.session.uid, body.session.cookie, decision_id,
+                   body.action, body.commentaire)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"ok": True}
+
+
+@app.get("/decisions", response_class=HTMLResponse)
+async def decisions_page():
+    return (pathlib.Path(__file__).parent / "decisions_public" /
+            "index.html").read_text(encoding="utf-8")
+
+
 @app.get("/metrics")
 async def metrics():
     total = STATS["deterministic"] + STATS["llm"] + STATS["refused"]
@@ -363,6 +526,14 @@ async def health():
 async def demo():
     """The clickable demo, served from the same origin as the API."""
     return DEMO_PAGE
+
+
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+app.mount("/decisions-static",
+          StaticFiles(directory=str(pathlib.Path(__file__).parent /
+                                    "decisions_public")),
+          name="decisions-static")
 
 
 @app.get("/", response_class=HTMLResponse)

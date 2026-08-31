@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Décisions — Tour de contrôle</title>
+<link rel="stylesheet" href="/decisions-static/style.css">
+</head>
+<body>
+<div id="app" class="hidden">
+  <header class="bar">
+    <div class="brand">
+      <span class="dot"></span>
+      <span class="brand-name">Décisions</span>
+      <span class="brand-sub">Tour de contrôle</span>
+    </div>
+    <div class="user" id="user-box">
+      <span id="user-name"></span>
+      <button id="logout" class="btn-ghost" title="Se déconnecter">Quitter</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="head">
+      <h1 id="headline">Ce qu'on te demande</h1>
+      <p id="subtitle" class="sub">Ce qui attend ta réponse.</p>
+    </section>
+
+    <div id="filters" class="filters hidden">
+      <button class="chip active" data-f="attente">À décider <span id="c-attente" class="cnt"></span></button>
+      <button class="chip" data-f="approuve">Approuvées <span id="c-approuve" class="cnt"></span></button>
+      <button class="chip" data-f="rejete">Rejetées <span id="c-rejete" class="cnt"></span></button>
+    </div>
+
+    <div id="list" class="list"></div>
+    <div id="empty" class="empty hidden">
+      <p>Rien ici. 🎉</p>
+      <p class="sub">Quand une décision t'attend, elle apparaît ici.</p>
+    </div>
+  </main>
+</div>
+
+<div id="login" class="login">
+  <div class="login-card">
+    <div class="brand center">
+      <span class="dot"></span>
+      <span class="brand-name">Décisions</span>
+    </div>
+    <p class="login-sub">Connecte-toi avec ton compte de la tour.<br>Chacun ne voit que ses décisions.</p>
+    <form id="login-form">
+      <label>Adresse e-mail
+        <input type="email" id="login-email" autocomplete="username" required>
+      </label>
+      <label>Mot de passe
+        <input type="password" id="login-pass" autocomplete="current-password" required>
+      </label>
+      <p id="login-error" class="error hidden"></p>
+      <button type="submit" class="btn primary">Se connecter</button>
+    </form>
+  </div>
+</div>
+
+<script src="/decisions-static/app.js"></script>
+</body>
+</html>
