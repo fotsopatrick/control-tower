@@ -17,3 +17,7 @@ backup_temporaire/
 gcp_router/main.py.avant-reparation
 git_status.log
 sgrm_selector.py
+seance-braignak-*.mp4
+ETUDE-BRAIGNAK-*.md
+rapportMCPGemini.txt
+*.mp4
