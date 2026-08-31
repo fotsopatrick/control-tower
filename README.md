@@ -98,8 +98,10 @@ See [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
 ## What a director actually sees
 
 The control plane is the mechanism. The tower is where a human uses it. Sign in
-to the second deployment (`admin` / `admin`) and every screen answers one of
-the three questions above.
+to the second deployment (`admin` / `admin`). **From the home page, click
+"Apps" (top-left grid icon) to open the tower's own launcher** -- grouped
+PILOTER / L'EQUIPE / FABRIQUER / CONTROLER, not Odoo's back office. Every
+screen below answers one of the three questions above.
 
 - **Cockpit** — `/tour/cockpit` — who is working right now, on what, and which
   requests are waiting. The daily view: not settings you open twice a month,
