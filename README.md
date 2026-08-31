@@ -2,6 +2,23 @@
 
 **Hackathon: All Things Agentic — track: The Fortified Enterprise Fleet**
 
+
+## The problem this solves
+
+An enterprise puts a fleet of agents to work and immediately loses three
+answers: **who triggered this action, was it allowed, and can we prove the
+agent stayed in scope.** Sending every action through a large model answers
+none of them — it adds cost and variance to decisions that are not speculative
+in the first place.
+
+That is the friction the **Fortified Enterprise Fleet** track names: agents
+that touch production data without breaking compliance, data sovereignty, or
+security. The Control Tower is the missing layer between the fleet and the
+data. Every request crosses a gate that **refuses in code** (same input, same
+verdict, always), the crossing is **recorded**, and the model is called **only
+when the request is genuinely new**. Determinism is what makes autonomy safe
+to grant at scale.
+
 ## What this buys — and how it was measured
 
 The Control Tower exists to make an agent fleet **produce faster without
