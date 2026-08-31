@@ -44,6 +44,42 @@ the Gemini fallback path and is not required by the demo.
 See [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
 
 
+
+## Asynchronous batch work — where the saving becomes obvious
+
+`POST /batch` takes a pile of agent requests, returns a job id in about 100 ms,
+and does the work in the background. `GET /batch/{id}` reports progress and the
+split between paths. This is the shape the track asks for: hand over the heavy
+lifting and walk away.
+
+Measured on the deployed service, 200 mixed requests (mostly known
+capabilities, some writes, some denied, some genuinely unknown):
+
+| | count | median | total |
+|---|---|---|---|
+| answered by a circuit | 180 | **9 ms** | 70 s |
+| refused by a guardrail | 10 | 0 ms | 0 s |
+| escalated to Gemini 3.5 | 10 | 5 899 ms | 121 s |
+
+**10 model calls instead of 200 — a 95% reduction.** That number does not
+depend on hardware, network or load: it is a count, not a timing.
+
+The latency ratio (655x on medians) does depend on those things, and it moved
+from 8x to 655x once the living map was parsed once instead of on every
+request. We report the median because the mean is inflated by warm-up and by
+requests contending inside a single container.
+
+### The circuit is real work, not a placeholder
+
+`read_carte` reads the **living map** — a survey of what actually exists in the
+tower: 478 entries across 9 zones (services, containers, volumes, agents,
+circuits, tools). It answers summaries, searches and per-zone listings. The
+shipped copy has every host address and identifier redacted.
+
+That matters: the claim "a deterministic path can replace the model" is only
+worth something if the deterministic path is doing work a model would otherwise
+have been asked to do.
+
 ## Bonus: Alice — where this architecture came from
 
 The deterministic cascade in this project was not designed on a whiteboard. It

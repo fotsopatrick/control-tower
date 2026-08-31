@@ -15,7 +15,7 @@ import pathlib
 import subprocess
 import time
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -51,6 +51,38 @@ def guardrail_verdict(name, entry, args):
         if not args.get("confirm"):
             return False, "write capability requires args.confirm = true"
     return True, "allowed"
+
+
+_MAP_CACHE = {}
+
+
+def carte_answer(argv):
+    """read_carte served in-process: the map is parsed once, then reused.
+
+    Spawning a fresh interpreter and re-reading a 104 KB file on every request
+    was costing ~1 s each under batch load. The circuit script stays the
+    reference implementation; this is the same logic without the fork.
+    """
+    import importlib.util
+    if "mod" not in _MAP_CACHE:
+        spec = importlib.util.spec_from_file_location(
+            "carte_circuit", TOUR / "circuits" / "relever-carte-apps.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _MAP_CACHE["mod"] = mod
+        _MAP_CACHE["data"], _MAP_CACHE["zones"] = mod.load()
+    mod, data, zones = _MAP_CACHE["mod"], _MAP_CACHE["data"], _MAP_CACHE["zones"]
+    import io
+    import contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        if not argv:
+            mod.summary(data, zones)
+        elif argv[0] == "--zone" and len(argv) > 1:
+            mod.one_zone(zones, " ".join(argv[1:]))
+        else:
+            mod.search(zones, argv)
+    return buf.getvalue().strip()
 
 
 STATS = {"deterministic": 0, "llm": 0, "refused": 0, "model_calls": 0}
@@ -142,12 +174,16 @@ async def mcp_router(call: ToolCall):
         if not script.exists():
             raise HTTPException(status_code=500,
                                 detail="circuit file missing: %s" % script)
-        proc = subprocess.run(["python3", str(script)], capture_output=True,
-                              text=True, cwd=str(TOUR), timeout=60)
+        if call.name == "read_carte":
+            output = carte_answer(list(call.args.get("argv", [])))
+        else:
+            proc = subprocess.run(["python3", str(script)], capture_output=True,
+                                  text=True, cwd=str(TOUR), timeout=60)
+            output = proc.stdout.strip()
         STATS["deterministic"] += 1
         record = {"capability": call.name, "decision": "MATCH",
                   "llm_required": False, "route": "deterministic",
-                  "matched": entry["path"], "result": proc.stdout.strip(),
+                  "matched": entry["path"], "result": output,
                   "model_calls": 0, "ms": round((time.time() - started) * 1000)}
         TRACE.append(record)
         return {"status": "executed", **record}
@@ -172,6 +208,112 @@ async def mcp_router(call: ToolCall):
               "ms": round((time.time() - started) * 1000)}
     TRACE.append(record)
     return {"status": "reasoned", **record}
+
+
+# --- asynchronous batch work -------------------------------------------------
+JOBS = {}
+
+
+class Batch(BaseModel):
+    requests: list = []
+    label: str = "batch"
+
+
+def _route_one(name, args):
+    """The same routing decision as /mcp/tour, without the HTTP layer."""
+    started = time.time()
+    registry = load_registry()
+    entry = registry.get(name)
+    allowed, reason = guardrail_verdict(name, entry, args)
+    if not allowed:
+        return {"capability": name, "decision": "REFUSED", "reason": reason,
+                "model_calls": 0, "ms": round((time.time() - started) * 1000)}
+    if entry:
+        script = TOUR / entry["path"]
+        if not script.exists():
+            return {"capability": name, "decision": "ERROR",
+                    "reason": "circuit missing", "model_calls": 0,
+                    "ms": round((time.time() - started) * 1000)}
+        if name == "read_carte":
+            out = carte_answer(list(args.get("argv", [])))
+        else:
+            proc = subprocess.run(["python3", str(script)] + list(args.get("argv", [])),
+                                  capture_output=True, text=True, cwd=str(TOUR),
+                                  timeout=60)
+            out = proc.stdout.strip()
+        return {"capability": name, "decision": "MATCH",
+                "result": out[:400], "model_calls": 0,
+                "ms": round((time.time() - started) * 1000)}
+    known = ", ".join(registry.keys()) or "(none)"
+    prompt = ("Fallback reasoner of a deterministic control plane. Known: %s. "
+              "Unknown capability '%s' with args %s. In one sentence, say what "
+              "a new circuit would have to do." % (known, name, json.dumps(args)))
+    try:
+        model, text = gemini_answer(prompt)
+    except Exception as exc:
+        return {"capability": name, "decision": "ERROR", "reason": str(exc)[:120],
+                "model_calls": 0, "ms": round((time.time() - started) * 1000)}
+    return {"capability": name, "decision": "NO_MATCH", "model": model,
+            "result": text[:400], "model_calls": 1,
+            "ms": round((time.time() - started) * 1000)}
+
+
+def _run_batch(job_id, items):
+    job = JOBS[job_id]
+    for i, it in enumerate(items):
+        rec = _route_one(it.get("name", ""), it.get("args", {}) or {})
+        job["results"].append(rec)
+        job["done"] = i + 1
+        job["model_calls"] += rec.get("model_calls", 0)
+        if rec["decision"] == "MATCH":
+            job["deterministic"] += 1
+        elif rec["decision"] == "NO_MATCH":
+            job["llm"] += 1
+        elif rec["decision"] == "REFUSED":
+            job["refused"] += 1
+        else:
+            job["errors"] += 1
+    job["state"] = "finished"
+    job["finished_ms"] = round((time.time() - job["_t0"]) * 1000)
+
+
+@app.post("/batch")
+async def submit_batch(batch: Batch, background: BackgroundTasks):
+    """Hand over a pile of work and walk away. Returns a job id immediately."""
+    if not batch.requests:
+        raise HTTPException(status_code=400, detail="requests is empty")
+    if len(batch.requests) > 5000:
+        raise HTTPException(status_code=400, detail="at most 5000 per batch")
+    job_id = "job-%d-%d" % (len(JOBS) + 1, int(time.time() * 1000) % 100000)
+    JOBS[job_id] = {"id": job_id, "label": batch.label, "state": "running",
+                    "total": len(batch.requests), "done": 0,
+                    "deterministic": 0, "llm": 0, "refused": 0, "errors": 0,
+                    "model_calls": 0, "results": [], "_t0": time.time()}
+    background.add_task(_run_batch, job_id, list(batch.requests))
+    return {"job_id": job_id, "state": "running", "total": len(batch.requests),
+            "poll": "/batch/" + job_id}
+
+
+@app.get("/batch/{job_id}")
+async def batch_status(job_id: str, full: bool = False):
+    job = JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="no such job")
+    out = {k: v for k, v in job.items() if not k.startswith("_") and k != "results"}
+    total_answered = job["deterministic"] + job["llm"] + job["refused"]
+    if total_answered:
+        out["share_without_model"] = round(
+            100.0 * (job["deterministic"] + job["refused"]) / total_answered, 1)
+    out["results"] = job["results"] if full else job["results"][-5:]
+    return out
+
+
+@app.get("/batch")
+async def batch_list():
+    return {"jobs": [{k: v for k, v in j.items()
+                      if k in ("id", "label", "state", "total", "done",
+                               "deterministic", "llm", "model_calls")}
+                     for j in JOBS.values()]}
 
 
 @app.post("/verify")
