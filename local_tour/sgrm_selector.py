@@ -1,3 +1,4 @@
+import os
 import json
 import urllib.request
 import subprocess
@@ -6,7 +7,7 @@ import time
 def select_strategy(problem):
     prompt = f"Choose strategy ['séquentiel', 'déduction'] for problem: '{problem}'. Output only the word."
     data = json.dumps({"model": "qwen2.5:7b", "prompt": prompt, "stream": False}).encode()
-    req = urllib.request.Request("http://20.97.179.141:11434/api/generate", data=data, headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(os.environ.get("LOCAL_MODEL_URL", "http://localhost:11434") + "/api/generate", data=data, headers={'Content-Type': 'application/json'})
     
     with urllib.request.urlopen(req) as resp:
         res = json.loads(resp.read().decode())

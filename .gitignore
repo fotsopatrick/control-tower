@@ -16,3 +16,4 @@ backup_temporaire/
 .claude/
 gcp_router/main.py.avant-reparation
 git_status.log
+sgrm_selector.py

@@ -68,6 +68,20 @@ _client = None
 _model_in_use = None
 
 
+def _local_answer(prompt):
+    """Fallback served by a self-hosted model (Ollama), no Google involved."""
+    import urllib.request
+    base = os.environ.get("LOCAL_MODEL_URL")
+    name = os.environ.get("LOCAL_MODEL_NAME", "qwen2.5:7b")
+    payload = json.dumps({"model": name, "prompt": prompt,
+                          "stream": False}).encode()
+    req = urllib.request.Request(base.rstrip("/") + "/api/generate",
+                                 data=payload,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=180) as r:
+        return "local/" + name, json.load(r)["response"].strip()
+
+
 def _clients():
     """Two ways in, tried in order: an API key, then Vertex AI (service identity)."""
     from google import genai
@@ -89,6 +103,9 @@ def _clients():
 def gemini_answer(prompt):
     """Real call through the Google GenAI SDK. Raises with the true errors."""
     global _client, _model_in_use
+    if os.environ.get("FALLBACK") == "local":
+        STATS["model_calls"] += 1
+        return _local_answer(prompt)
     tried = []
     for how, client in _clients():
         for model in MODEL_CANDIDATES:

@@ -98,6 +98,34 @@ class Film:
             img.save("/tmp/frames/f%05d.png" % self.n)
 
 
+def show_image(film, path, caption, seconds=7):
+    """Full-frame still, used for the Cloud Run console capture."""
+    shot = Image.open(path).convert("RGB")
+    canvas = Image.new("RGB", (W, H), BG)
+    scale = min((W - 120) / shot.width, (H - 220) / shot.height)
+    shot = shot.resize((int(shot.width * scale), int(shot.height * scale)))
+    canvas.paste(shot, ((W - shot.width) // 2, 150))
+    d = ImageDraw.Draw(canvas)
+    d.rectangle([0, 0, W, 4], fill=BLUE)
+    d.text((MARGIN, 70), caption, font=bold, fill=WHITE)
+    film._emit(canvas, int(seconds * FPS))
+
+
+def show_text(film, path, title, seconds=9, width=118):
+    """A captured terminal transcript, shown as-is."""
+    raw = open(path, encoding="utf-8", errors="replace").read()
+    raw = raw.replace("\x1b[1m", "").replace("\x1b[0m", "")
+    lines = [(title, WHITE, bold), ("", FG, font)]
+    for ln in raw.split("\n"):
+        ln = ln.rstrip()
+        while len(ln) > width:
+            lines.append(("  " + ln[:width], FG, font)); ln = "    " + ln[width:]
+        lines.append(("  " + ln, FG, font))
+    for i in range(0, len(lines), 30):
+        chunk = lines[:2] + lines[max(i, 2):i + 30] if i else lines[:30]
+        film.screen(chunk, hold=seconds, reveal=False)
+
+
 def main():
     url = sys.argv[1] if len(sys.argv) > 1 else \
         "https://control-tower-491595433989.europe-west9.run.app"
@@ -210,6 +238,26 @@ def main():
              ("  Honest limit: the circuit shown here prints one line.", DIM, font),
              ("  A circuit doing real work would be slower.", DIM, font)]
     film.screen(lines, hold=8.0)
+
+    # --- Devpost requirement 1: the Cloud Run console ----------------------
+    import os
+    shot = "livraison-hackathon/captures/cloud-run-console.jpg"
+    if os.path.exists(shot):
+        show_image(film, shot,
+                   "REQUIREMENT 1  —  the service running on Google Cloud Run",
+                   seconds=8)
+
+    # --- Devpost requirement 2: the demo flight log ------------------------
+    if os.path.exists("livraison-hackathon/preuve-execution-cloud.txt"):
+        show_text(film, "livraison-hackathon/preuve-execution-cloud.txt",
+                  "REQUIREMENT 2  —  ./demo_flight.sh against the deployed service",
+                  seconds=10)
+
+    # --- Devpost requirement 3: same result, Gemini and a local model ------
+    if os.path.exists("livraison-hackathon/preuve-deux-modeles.txt"):
+        show_text(film, "livraison-hackathon/preuve-deux-modeles.txt",
+                  "REQUIREMENT 3  —  identical result with Gemini and with a "
+                  "self-hosted model", seconds=12)
 
     img, d = film._blank()
     d.text((MARGIN, 430), "The model is not removed.", font=mid, fill=DIM)

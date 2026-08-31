@@ -1,0 +1,19 @@
+A = fallback Google Gemini : https://control-tower-491595433989.europe-west9.run.app
+B = fallback self-hosted   : http://127.0.0.1:8090
+
+request                            A         B         identical?
+----------------------------------------------------------------------
+read_carte                         MATCH     MATCH     YES
+create_task                        REFUSED   REFUSED   YES
+create_task +confirm               MATCH     MATCH     YES
+drop_database                      REFUSED   REFUSED   YES
+verify(17) -> oracle               712       712       YES
+
+Now the one place the models legitimately differ:
+  A  decision=NO_MATCH  model=vertex/gemini-2.5-flash
+  B  decision=NO_MATCH  model=local/qwen2.5:7b
+  routing decision identical : YES
+  wording identical          : NO   (expected: NO -- two different models, two different sentences)
+
+VERDICT: 0 mismatch(es) on the deterministic path.
+The architecture, not the model, decides what happens.
