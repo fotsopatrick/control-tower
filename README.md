@@ -43,6 +43,20 @@ the Gemini fallback path and is not required by the demo.
 
 See [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
 
+
+## Bonus: Alice — where this architecture came from
+
+The deterministic cascade in this project was not designed on a whiteboard. It
+was forced on us when the credit on a paid model ran out and the only option
+left was a model running on our own hardware. That machine is Alice, and her
+router asks the same four questions in the same order: map, memory, tools,
+then — only then — the model.
+
+Her reasoning code is in [`alice/`](alice/), with the full story, the measured
+numbers, and an explicit list of what was deliberately left out (her databases
+and logs, which are private conversations). She is offered as context, not as
+part of the judged submission.
+
 ## Setup / spin-up
 
 ```bash

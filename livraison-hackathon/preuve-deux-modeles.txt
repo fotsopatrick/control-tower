@@ -10,7 +10,7 @@ drop_database                      REFUSED   REFUSED   YES
 verify(17) -> oracle               712       712       YES
 
 Now the one place the models legitimately differ:
-  A  decision=NO_MATCH  model=vertex/gemini-2.5-flash
+  A  decision=NO_MATCH  model=vertex/gemini-3.5-flash
   B  decision=NO_MATCH  model=local/qwen2.5:7b
   routing decision identical : YES
   wording identical          : NO   (expected: NO -- two different models, two different sentences)

@@ -193,6 +193,25 @@ async def metrics():
     return {"requests": total, **STATS, "trace": TRACE[-25:]}
 
 
+@app.get("/diag")
+async def diag():
+    """Which credential paths work, and which models answer. No secret leaves."""
+    from google import genai
+    out = {"has_api_key": bool(os.environ.get("GOOGLE_API_KEY")),
+           "project": os.environ.get("GOOGLE_CLOUD_PROJECT"),
+           "candidates": MODEL_CANDIDATES, "results": []}
+    for how, client in _clients():
+        for model in MODEL_CANDIDATES:
+            try:
+                r = client.models.generate_content(model=model, contents="Say OK.")
+                out["results"].append({"via": how, "model": model, "ok": True,
+                                       "said": (r.text or "").strip()[:20]})
+            except Exception as exc:
+                out["results"].append({"via": how, "model": model, "ok": False,
+                                       "error": str(exc)[:220]})
+    return out
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "capabilities": sorted(load_registry().keys())}
