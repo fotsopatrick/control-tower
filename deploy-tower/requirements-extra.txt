@@ -1,0 +1,3 @@
+# Python packages the published image is missing.
+# Without qifparse every Odoo page answers 500.
+qifparse

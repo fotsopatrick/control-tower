@@ -1,0 +1,63 @@
+# The open-source tower, deployed on Google Compute Engine.
+# This is the exact file running at http://34.155.174.180:8069
+#
+# Two things are not obvious and cost us an evening. Both are written down
+# here so the next person does not lose the same hours.
+#
+# 1. --database and --no-database-list are BOTH required.
+#    The published image sets list_db = False for safety. But Odoo resolves
+#    "which database do I open?" by reading that same list -- so with the list
+#    disabled it finds nothing and falls back to the database selector.
+#    The safety feature bites its own tail. Naming the database explicitly on
+#    the command line is what breaks the loop.
+#
+# 2. The image needs one extra Python package: qifparse.
+#    Without it, every page returns 500. See deploy-tower/README.md.
+#
+# Passwords come from a .env file created on the machine, never committed.
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: tour_prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  tour:
+    image: ghcr.io/fotsopatrick/tour-community:latest
+    ports:
+      - "0.0.0.0:8069:8069"
+    entrypoint: ["odoo"]
+    command:
+      - "--http-interface=0.0.0.0"
+      - "--http-port=8069"
+      - "--db_host=db"
+      - "--db_port=5432"
+      - "--db_user=odoo"
+      - "--db_password=${POSTGRES_PASSWORD}"
+      - "--database=tour_azure"
+      - "--db-filter=^tour_azure$$"
+      - "--no-database-list"
+    depends_on:
+      - db
+    environment:
+      DB_NAME: tour_azure
+      ODOO_DB_HOST: db
+      ODOO_DB_PORT: "5432"
+      ODOO_DB_USER: odoo
+      ODOO_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      TZ: Europe/Paris
+    volumes:
+      - odoo-data:/var/lib/odoo
+      - ./odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./custom-addons:/mnt/extra-addons:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  odoo-data:

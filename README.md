@@ -2,6 +2,36 @@
 
 **Hackathon: All Things Agentic — track: The Fortified Enterprise Fleet**
 
+## What this buys — and how it was measured
+
+The Control Tower exists to make an agent fleet **produce faster without
+producing garbage**. So this hackathon is not the product. It is the
+**measurement**: a hard deadline, a cold start, one person.
+
+Registered 29 August. Submitted 31 August. In that window this repository
+gained a deterministic router deployed on Cloud Run, guardrails that refuse in
+pure code, delegation across specialised sub-agents, an independent oracle,
+and an audit script that **fails the build** when this README claims something
+the disk does not support.
+
+**78 files. 8,325 lines of Python and shell. Two days.**
+
+*(Snapshot taken 31 August 2026, 20:00 Europe/Paris. The count moves as the
+repository moves — that is why the command is printed below rather than the
+number alone.)*
+
+Counted, not asserted — the command is in the repository:
+
+```bash
+find . -type f \( -name '*.py' -o -name '*.sh' \) -not -path './.git/*' \
+     -newermt '2026-08-29' -exec cat {} + | wc -l
+```
+
+The friction removed is not "fewer model calls". That is the mechanism, not the
+gain. The friction removed is **the human who no longer has to re-read every
+action before it runs** — because the gate that matters does not depend on a
+model's mood. Determinism is what makes autonomy *grantable at scale*.
+
 ## The question
 
 Can a large share of an agent's work be moved out of probabilistic reasoning
@@ -116,6 +146,27 @@ shipped copy has every host address and identifier redacted.
 That matters: the claim "a deterministic path can replace the model" is only
 worth something if the deterministic path is doing work a model would otherwise
 have been asked to do.
+
+
+## Second deployment: the tower this control plane governs
+
+The judged part of this submission is the control plane on Cloud Run. It
+governs a platform that also runs on Google Cloud, on a Compute Engine VM:
+
+**http://34.155.174.180:8069** — login `admin`, password `admin`
+
+Signing in lands on `/tour/dashboard` — the tower's own home, not Odoo's
+back office. It shows what a director actually asks for: *"4 decisions are
+waiting for you — approve, or refuse with a word."*
+
+That deployment carries **88 in-house Odoo modules, 21 circuit templates,
+67 control gates, 58 skills and 22 agents**. It holds no personal data: it is
+a copy of a test database, provided so judges can see the platform rather than
+take its size on trust.
+
+Reproduce it with [`deploy-tower/`](deploy-tower/) — compose file, the extra
+Python package the published image is missing, and the two traps that cost us
+an evening, written down rather than hidden.
 
 ## Bonus: Alice — where this architecture came from
 
