@@ -1,0 +1,20 @@
+{
+  "read_carte": {
+    "description": "Lit la carte vivante locale",
+    "type": "script",
+    "path": "circuits/relever-carte-apps.py",
+    "permission": "read"
+  },
+  "create_task": {
+    "description": "Cr\u00e9e une t\u00e2che locale",
+    "type": "script",
+    "path": "circuits/creer_tache.py",
+    "permission": "write"
+  },
+  "build_3d_asset": {
+    "description": "G\u00e9n\u00e8re un asset 3D depuis une spec",
+    "type": "script",
+    "path": "/home/orel/studio/world_builder/blender_scripts/construire.py",
+    "permission": "write"
+  }
+}

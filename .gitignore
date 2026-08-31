@@ -1,0 +1,18 @@
+# Work-in-progress and machine-local things, not part of the submission.
+ancien-root/
+docs.ancien-root/
+gcp_router.ancien-root/
+chats/
+logs/
+logs.json
+audit_validation/
+tool-outputs/
+*.tar.gz
+__pycache__/
+*.pyc
+.venv*/
+state_snapshot/
+backup_temporaire/
+.claude/
+gcp_router/main.py.avant-reparation
+git_status.log

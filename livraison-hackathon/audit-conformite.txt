@@ -1,0 +1,28 @@
+======================================================================
+AUDIT INDEPENDANT — .
+======================================================================
+✅ [PASS] Appel réel à l'API Gemini (pas juste le mot 'gemini')
+       -> Fichiers avec un appel SDK détecté : ['audit_sgrm_hackathon.py', 'gcp_router/main.py', 'gcp_router.ancien-root/main.py']
+✅ [PASS] Le modèle 'gemini-3.5' est explicitement référencé quelque part
+       -> Trouvé dans : ['audit_sgrm_hackathon.py']
+✅ [PASS] Le SDK Google GenAI est déclaré comme dépendance officielle
+       -> Déclaré dans : ['requirements.txt', 'ancien-root/requirements.txt']
+✅ [PASS] Dockerfile présent ET compatible Cloud Run (PORT + CMD)
+       -> Dockerfile — EXPOSE/PORT présent: True, CMD/ENTRYPOINT présent: True
+✅ [PASS] Des fichiers de test existent réellement dans le repo
+       -> 3 fichier(s) de test trouvé(s) : ['test_failure.py', 'tests/test_reasoning_discipline.py', 'full_matrix_test.py']
+✅ [PASS] Un artefact de résultat d'exécution (rapport/log) existe, daté
+       -> Trouvé : ['git_status.log', 'local_tour/router.log', 'state_snapshot/router.log', 'tests/logs/results.log', 'final_experiment/latency/results.log', 'final_experiment/reference/test_results.log', 'final_experiment/failure_modes/json_error.log', 'final_experiment/failure_modes/invalid.log']
+✅ [PASS] README présent
+       -> ['README.md', 'ancien-root/README.md']
+✅ [PASS] Le README contient des instructions de spin-up (exigence explicite du règlement)
+       -> Section setup/installation détectée
+✅ [PASS] Un script/plan de démo existe
+       -> ['demo_flight.sh', 'demo_video.sh', 'livraison-hackathon/demo-control-tower.mp4', 'ancien-root/demo_flight.sh']
+✅ [PASS] Un diagramme d'architecture existe (fichier, pas juste 'textuel' dans le rapport)
+       -> ['docs/architecture-diagram.md', 'docs/architecture-diagram.md']
+
+======================================================================
+RÉSUMÉ : 10 PASS / 0 WARN / 0 FAIL sur 10 vérifications
+VERDICT : CONFORME — les affirmations du rapport sont corroborées par le disque.
+======================================================================

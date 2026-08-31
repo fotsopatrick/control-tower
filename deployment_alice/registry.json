@@ -1,0 +1,14 @@
+{
+  "read_carte": {
+    "description": "Lit la carte vivante locale",
+    "type": "script",
+    "path": "circuits/relever-carte-apps.py",
+    "permission": "read"
+  },
+  "create_task": {
+    "description": "Crée une tâche locale",
+    "type": "script",
+    "path": "circuits/creer_tache.py",
+    "permission": "write"
+  }
+}

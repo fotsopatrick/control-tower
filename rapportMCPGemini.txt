@@ -1,0 +1,42 @@
+RAPPORT D'IMPLÉMENTATION : SYSTÈME DE ROUTAGE DÉTERMINISTE (ARCHITECTURE TOUR)
+Date : 31 août 2026
+
+OBJET : Réduction de la consommation de tokens par routage déterministe.
+
+CONTEXTE
+Pour répondre à l'objectif de réduction des tokens, j'ai implémenté un système de routage local déterministe reproduisant la logique de la "Tour de contrôle" observée sur la VM Azure. Ce système permet d'exécuter des tâches répétitives (circuits) sans solliciter l'intelligence du LLM.
+
+ARCHITECTURE
+Le système repose sur un serveur JSON-RPC 2.0 minimaliste qui intercepte les requêtes, vérifie les permissions et exécute les scripts locaux correspondants.
+
+COMPOSANTS
+1. router.py : Serveur HTTP local (port 8080) implémentant le protocole JSON-RPC 2.0.
+2. registry.json : Registre centralisé liant les compétences (skills) aux scripts exécutables.
+3. guardrails.py : Filtre de sécurité élémentaire avant l'exécution.
+4. circuits/ : Répertoire contenant les scripts exécutables (Python/Bash).
+
+INSTALLATION ET REPRODUCTION
+Pour déployer ce système sur une autre instance, suivez ces étapes :
+
+1. Création de la structure :
+   mkdir -p local_tour/circuits
+
+2. Fichiers requis :
+   - registry.json (définit les mappings compétence -> script)
+   - guardrails.py (règles d'autorisation)
+   - router.py (le moteur de routage)
+
+3. Lancement :
+   python3 router.py &
+
+4. Utilisation (via cURL ou client JSON-RPC) :
+   curl -X POST http://localhost:8080 -d '{"jsonrpc": "2.0", "method": "call", "params": {"name": "read_carte"}, "id": 1}'
+
+AVANTAGES
+- Consommation de tokens : Nulle pour les tâches intégrées dans le registre (0 LLM).
+- Vitesse : Exécution quasi-instantanée des circuits.
+- Observabilité : Chaque circuit est une boîte noire mesurable.
+
+LIMITES ACTUELLES
+- Minimalisme : Pas de gestion avancée des erreurs Odoo (gestion native des exceptions Python).
+- Sécurité : Le garde-fou actuel est basique (liste noire), à renforcer selon les besoins.

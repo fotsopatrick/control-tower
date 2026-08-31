@@ -1,0 +1,9 @@
+input | reasoner | oracle | verdict
+------+----------+--------+--------
+   17 |      712 |    712 | PASS
+   20 |      802 |    802 | PASS
+  100 |     3202 |   3202 | PASS
+    0 |      202 |    202 | PASS
+   -3 |      112 |    112 | PASS
+
+5 input(s) checked, 0 failure(s)

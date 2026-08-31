@@ -1,0 +1,11 @@
+[
+  {
+    "problem": "Apply the secret procedure [op_q9, op_k7, op_m2] to 17",
+    "strategy": "sequential",
+    "operator": "apply_procedure",
+    "steps": ["op_q9", "op_k7", "op_m2"],
+    "verifier": "independent_oracle",
+    "expected": 712,
+    "note": "expected is produced by local_tour/independent_oracle.py, never written by hand"
+  }
+]

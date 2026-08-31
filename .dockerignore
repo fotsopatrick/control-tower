@@ -1,0 +1,9 @@
+.venv-demo
+ancien-root
+docs.ancien-root
+gcp_router.ancien-root
+chats
+logs
+logs.json
+*.tar.gz
+__pycache__
