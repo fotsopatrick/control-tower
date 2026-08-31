@@ -94,6 +94,70 @@ See [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
 
 
 
+
+## What a director actually sees
+
+The control plane is the mechanism. The tower is where a human uses it. Sign in
+to the second deployment (`admin` / `admin`) and every screen answers one of
+the three questions above.
+
+- **Cockpit** — `/tour/cockpit` — who is working right now, on what, and which
+  requests are waiting. The daily view: not settings you open twice a month,
+  but the fleet you watch every day.
+- **Decisions desk** — `/tour/decisions` — what agents proposed and a human has
+  not yet ruled on. Approve, or refuse *with a written reason* — a silent "no"
+  teaches nobody. Production has 2 130 such decisions on record, **513 of them
+  refused**: proof the gate is not decorative.
+- **The fleet** — `/tour/cockpit/agents` — the 21 agents, their engine, their
+  level, and what each is allowed to do. 9 of them run on no model at all.
+- **Guardrails** — `/tour/cockpit/defense` — the deny list and the confirm
+  rules, and every time they fired.
+
+None of these is a mock-up. They read the same Odoo database that has been
+running in production for a month.
+
+## Architecture
+
+The full picture — agents, the tower's six columns (living map, circuits,
+knowledge, guardrails, observability, MCP), the hard-fuse vs soft-decision
+routing, the enterprise capabilities and the cross-cutting concerns — is in
+[`docs/architecture-complete.png`](docs/architecture-complete.png)
+([PDF](docs/architecture-complete.pdf)). A text version of the request path is
+in [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
+
+
+## How a request flows (following the diagram)
+
+Every agent request crosses the same path — the diagram's centre and right
+columns:
+
+1. **The agent asks.** Claude, Gemini, a local model — or one of the tower's
+   own specialised agents (Clark, Victor, Lois...). The engine is
+   interchangeable; the path is not.
+
+2. **Classification & risk.** The request's intent, impact and risk are read.
+   This decides which of two paths it takes.
+
+3. **Hard-fuse path — mechanical, verifiable actions.** Known capability, no
+   judgement needed. The guardrails evaluate it (deny list, write-confirm), it
+   runs *with zero model calls*, and the crossing is written to the audit
+   trail. Same input, same verdict, every time.
+
+4. **Soft-decision path — judgement, content, context.** No rule matches. A
+   Decision record is created in Odoo with a priority and a state
+   (to-decide / approved / refused). A **human approves or refuses**; only then
+   does it execute; the crossing is recorded. This is the only path that calls
+   the model, and only when the request is genuinely new.
+
+The point of the two paths: an enterprise does not want *every* action to wait
+for a human, nor *every* action to run unchecked. The router decides which is
+which — in code, not in a prompt — and both leave a trace.
+
+Cross-cutting, on every layer: security, governance, observability, audit &
+compliance, resilience, extensibility. And **Alice** sits beside the fleet as
+the backup engine — same agent, different role — so the tower keeps answering
+when the primary model is unavailable.
+
 ## Delegation to specialised sub-agents
 
 A fleet is not one agent wearing many hats. Each agent in this tower has a
