@@ -239,6 +239,60 @@ def main():
              ("  A circuit doing real work would be slower.", DIM, font)]
     film.screen(lines, hold=8.0)
 
+    # --- the batch: 200 requests handed over, worked in the background ----
+    print("submitting a batch of 200 requests ...")
+    import statistics as _st
+    WORDS = ["securite", "agent", "circuit", "volume", "conteneur",
+             "moteur", "page", "outil"]
+    reqs = []
+    for i in range(200):
+        m = i % 20
+        if m < 15:
+            reqs.append({"name": "read_carte", "args": {"argv": [WORDS[i % 8]]}})
+        elif m < 18:
+            reqs.append({"name": "create_task", "args": {"confirm": True}})
+        elif m == 18:
+            reqs.append({"name": "drop_database", "args": {}})
+        else:
+            reqs.append({"name": "unknown_capability_%d" % i,
+                         "args": {"client": "ACME"}})
+    t0 = time.time()
+    job, _ = post(url, "/batch", {"requests": reqs, "label": "200 agent requests"})
+    accept_ms = round((time.time() - t0) * 1000)
+    while True:
+        st = get(url, "/batch/" + job["job_id"])
+        if st.get("state") == "finished":
+            break
+        time.sleep(6)
+    full = get(url, "/batch/" + job["job_id"] + "?full=true")
+    rs = full["results"]
+    dms = [x["ms"] for x in rs if x["decision"] == "MATCH"] or [0]
+    lms = [x["ms"] for x in rs if x["decision"] == "NO_MATCH"] or [0]
+
+    lines = [("ASYNCHRONOUS BATCH  —  200 agent requests handed over at once",
+              WHITE, bold), ("", FG, font),
+             ("  POST /batch   ->  job accepted in %d ms. The caller walks away."
+              % accept_ms, BLUE, font),
+             ("  GET  /batch/%s" % job["job_id"], BLUE, font),
+             ("", FG, font),
+             ("  path                      count    median        total",
+              DIM, font),
+             ("  " + "-" * 62, DIM, font),
+             ("  answered by a circuit      %3d    %5.0f ms    %6.0f s"
+              % (len(dms), _st.median(dms), sum(dms) / 1000.0), GREEN, font),
+             ("  refused by a guardrail     %3d        0 ms         0 s"
+              % full["refused"], RED, font),
+             ("  escalated to Gemini 3.5    %3d    %5.0f ms    %6.0f s"
+              % (len(lms), _st.median(lms), sum(lms) / 1000.0), YELLOW, font),
+             ("", FG, font),
+             ("  MODEL CALLS: %d instead of %d      ->  %.0f%% fewer"
+              % (full["model_calls"], len(rs),
+                 100 * (1 - full["model_calls"] / float(len(rs)))), WHITE, bold),
+             ("", FG, font),
+             ("  That figure is a count, not a timing:", DIM, font),
+             ("  it does not move with hardware, network or load.", DIM, font)]
+    film.screen(lines, hold=9.0)
+
     # --- Devpost requirement 1: the Cloud Run console ----------------------
     import os
     shot = "livraison-hackathon/captures/cloud-run-console.jpg"

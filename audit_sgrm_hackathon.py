@@ -86,6 +86,10 @@ def main():
             continue
         if gemini_call_pattern.search(content):
             files_with_call.append(str(f.relative_to(project_root)))
+        # L'auditeur ne se valide plus lui-meme : sa propre expression de
+        # recherche contient « gemini-3.5 », et elle passait pour une preuve.
+        if f.name == "audit_sgrm_hackathon.py":
+            continue
         if gemini_model_string.search(content):
             files_with_model_string.append(str(f.relative_to(project_root)))
 
@@ -95,11 +99,26 @@ def main():
         f"Fichiers avec un appel SDK détecté : {files_with_call}" if files_with_call
         else "Aucun fichier .py ne contient un vrai appel genai/GenerativeModel/generate_content",
     )
+    # EXIGENCE OBLIGATOIRE du reglement All Things Agentic : Gemini 3.5 ou
+    # plus recent. Le controle vise le ROUTEUR, pas le depot entier : un nom
+    # de modele cite dans un README ne fait tourner aucun service.
+    routeur = project_root / "gcp_router" / "main.py"
+    contenu_routeur = read_text_safe(routeur) or ""
+    premier = re.search(r'"(gemini-[^",]+)', contenu_routeur)
+    premier_modele = premier.group(1) if premier else "(aucun)"
+    conforme = premier_modele.startswith("gemini-3.")
     check(
-        "Le modèle 'gemini-3.5' est explicitement référencé quelque part",
+        "Le routeur appelle Gemini 3.5 ou plus recent (exigence obligatoire)",
+        conforme,
+        f"gcp_router/main.py essaie d'abord : {premier_modele}" if conforme
+        else f"NON CONFORME : le routeur essaie d'abord {premier_modele}, "
+             f"le reglement exige gemini-3.5 minimum",
+    )
+    check(
+        "Le modèle 'gemini-3.5' est référencé ailleurs que dans l'auditeur",
         len(files_with_model_string) > 0,
         f"Trouvé dans : {files_with_model_string}" if files_with_model_string
-        else "Le string 'gemini-3.5' n'apparaît nulle part dans le code — vérifier quel modèle est vraiment appelé",
+        else "Le string 'gemini-3.5' n'apparaît nulle part hors de l'auditeur",
         warn=not files_with_model_string,
     )
 

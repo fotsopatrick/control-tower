@@ -1,0 +1,28 @@
+PHOTO DE L'ETAT QUI MARCHE
+Prise le 31/08/2026 a 18h35 — heure de Paris
+Service : https://control-tower-491595433989.europe-west9.run.app
+======================================================================
+
+--- 1. sante du service ---
+{"ok":true,"capabilities":["build_3d_asset","create_task","read_carte"]}
+[code HTTP 200 en 1.472755s]
+
+--- 2. capacite CONNUE : read_carte (doit passer SANS modele) ---
+{"status":"executed","capability":"read_carte","decision":"MATCH","llm_required":false,"route":"deterministic","matched":"circuits/relever-carte-apps.py","result":"LIVING MAP — surveyed 2026-08-30 01:38:04\n478 entries across 9 zones\n\n  Les outils              260\n  Les webapps              75\n  Les volumes              38\n  L'equipe                 25\n  Les conteneurs           22\n  Les 
+
+--- 3. ecriture SANS confirmation (le garde-fou doit refuser) ---
+{"status":"refused","capability":"create_task","decision":"REFUSED","llm_required":false,"route":"refused","reason":"write capability requires args.confirm = true","model_calls":0,"ms":0}
+
+--- 4. ecriture AVEC confirmation, args.confirm=true (doit passer) ---
+{"status":"executed","capability":"create_task","decision":"MATCH","llm_required":false,"route":"deterministic","matched":"circuits/creer_tache.py","result":"Circuit: tâche créée et fichier preuve_mcp.txt généré.","model_calls":0,"ms":30}
+
+--- 5. ordre destructeur (doit etre refuse, liste noire) ---
+{"status":"refused","capability":"drop_database","decision":"REFUSED","llm_required":false,"route":"refused","reason":"capability 'drop_database' is on the deny list","model_calls":0,"ms":0}
+
+--- 6. capacite INCONNUE (le modele doit repondre) ---
+{"status":"reasoned","capability":"send_invoice_to_client","decision":"NO_MATCH","llm_required":true,"route":"llm","model":"vertex/gemini-3.5-flash","result":"None of the existing capabilities cover sending an invoice, as `create_task` can only track the action but not execute it. A new circuit would need to integrate with an external billing, payment, or email service to generate and dispatch financial documents. This new capability would also require updated input arguments, such as the recipi
+
+--- 7. les compteurs ---
+{"requests":5,"deterministic":1,"llm":1,"refused":3,"model_calls":1,"trace":[{"capability":"read_carte","decision":"MATCH","llm_required":false,"route":"deterministic","matched":"circuits/relever-carte-apps.py","result":"LIVING MAP — surveyed 2026-08-30 01:38:04\n478 entries across 9 zones\n\n  Les outils              260\n  Les webapps              75\n  Les volumes              38\n  L'equipe 
+
+======================================================================
