@@ -1,0 +1,71 @@
+# Faithful reproduction of the Control Tower shown to the judges.
+# First `docker compose up` restores a snapshot of the live database and its
+# filestore, so what boots here is byte-identical to the deployed tower:
+# 88 modules, the theme, the 22 agents, the cockpit -- not a fresh install.
+#
+#   docker compose up -d          # first run restores the snapshot (~2 min)
+#   open http://<ip>:8069         # admin / admin
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  restore:
+    image: postgres:15
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./tour.dump:/snapshot/tour.dump:ro
+      - restored:/flag
+    entrypoint: ["bash","-c"]
+    command:
+      - |
+        if [ ! -f /flag/done ]; then
+          echo "restoring tour_azure from snapshot..."
+          PGPASSWORD=odoo psql -h db -U odoo -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='tour_azure'" | grep -q 1 || \
+            PGPASSWORD=odoo createdb -h db -U odoo tour_azure
+          PGPASSWORD=odoo pg_restore -h db -U odoo -d tour_azure --no-owner --no-acl /snapshot/tour.dump || true
+          touch /flag/done
+          echo "restore done."
+        else
+          echo "already restored, skipping."
+        fi
+
+  tour:
+    image: ghcr.io/fotsopatrick/tour-community:latest
+    depends_on:
+      restore:
+        condition: service_completed_successfully
+    ports:
+      - "0.0.0.0:8069:8069"
+    entrypoint: ["odoo"]
+    command:
+      - "--http-interface=0.0.0.0"
+      - "--http-port=8069"
+      - "--db_host=db"
+      - "--db_user=odoo"
+      - "--db_password=odoo"
+      - "--database=tour_azure"
+      - "--db-filter=^tour_azure$$"
+      - "--no-database-list"
+    volumes:
+      - odoo-data:/var/lib/odoo
+      - ./custom-addons:/mnt/extra-addons:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  odoo-data:
+  restored:

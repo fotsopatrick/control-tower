@@ -1,0 +1,6 @@
+# La photo de la base et les fichiers ne sont PAS publies :
+# ils contiennent des cles et des donnees. Voir README pour l obtenir.
+tour.dump
+filestore.tgz
+.env
+custom-addons/
