@@ -60,7 +60,7 @@ sudo docker compose up -d
 #    Wait ~15s after step 6 so Postgres is ready before this runs.
 sleep 15
 P=$(grep POSTGRES_PASSWORD .env | cut -d= -f2)
-sudo docker compose exec -T tour odoo -d tour_prod \
+sudo docker compose run --rm --entrypoint odoo tour -d tour_prod \
   -i base,web,tour_community_chat \
   --db_host=db --db_user=odoo --db_password="$P" --stop-after-init
 
