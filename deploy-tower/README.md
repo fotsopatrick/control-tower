@@ -1,73 +1,94 @@
-# Deploying the open-source tower on Google Cloud
+# Deploying the open-source tower on a fresh machine
 
-This folder reproduces the second deployment of this submission: the tower
-itself — 88 in-house Odoo modules, 21 circuit templates, 67 control gates,
-58 skills, 22 agents — running on a Google Compute Engine VM.
+This reproduces the second deployment: the tower itself — 93 in-house Odoo
+modules, 21 circuit templates, 67 control gates, 58 skills, 22 agents.
 
 **Live:** http://34.155.174.180:8069 — `admin` / `admin`
 
-The control plane (the judged part of this submission) runs separately on
-Cloud Run and needs no credentials. This tower is the platform it governs.
+The judged control plane runs separately on Cloud Run and needs no
+credentials. This tower is the platform it governs.
 
-## Steps
+## Two repositories, one deployment
+
+The compose file lives here, in **control-tower**. The 93 Odoo modules live in
+the sister repository **tour-community**. You need both, side by side. This is
+deliberate: the modules are a separate open-source project, disclosed as
+pre-existing work.
+
+## Copy-paste, on a clean Ubuntu 22.04 machine
 
 ```bash
-# 1. A machine. e2-standard-2 is enough: 2 vCPU, 8 GB, ~25 EUR/month.
-gcloud compute instances create tour-opensource \
-  --zone=europe-west9-b --machine-type=e2-standard-2 \
-  --image-family=ubuntu-2204-lts --image-project=ubuntu-os-cloud \
-  --boot-disk-size=40GB --tags=tour-web
+# 1. Docker
+sudo apt-get update -qq
+sudo apt-get install -y ca-certificates curl git
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+sudo apt-get update -qq
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-gcloud compute firewall-rules create autoriser-tour-web \
-  --allow=tcp:80,tcp:443,tcp:8069 --target-tags=tour-web
+# 2. Both repositories, side by side
+git clone https://github.com/fotsopatrick/control-tower.git
+git clone https://github.com/fotsopatrick/tour-community.git
+cd control-tower/deploy-tower
 
-# 2. Docker, then passwords generated ON the machine and never committed.
-sudo mkdir -p /opt/tour && cd /opt/tour
+# 3. Bring the 93 modules next to the compose file
+cp -r ../../tour-community/custom-addons ./custom-addons
+
+# 4. The Odoo config the compose file mounts
+cat > odoo.conf <<'CONF'
+[options]
+addons_path = /mnt/extra-addons
+data_dir = /var/lib/odoo
+list_db = True
+dbfilter = ^tour_prod$
+CONF
+
+# 5. Passwords, generated here, never committed
 printf 'POSTGRES_PASSWORD=%s\nODOO_ADMIN_PASSWD=%s\n' \
-  "$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)" \
-  "$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)" | sudo tee .env
-sudo chmod 600 .env
+  "$(openssl rand -base64 18 | tr -d '/+=' | head -c 18)" \
+  "$(openssl rand -base64 18 | tr -d '/+=' | head -c 18)" > .env
+chmod 600 .env
 
-# 3. This compose file, the addons, and the config. Then:
+# 6. Start
 sudo docker compose up -d
 
-# 4. The extra package the image is missing.
+# 7. Create the database with a first module (2-4 min).
+#    Wait ~15s after step 6 so Postgres is ready before this runs.
+sleep 15
+P=$(grep POSTGRES_PASSWORD .env | cut -d= -f2)
+sudo docker compose exec -T tour odoo -d tour_prod \
+  -i base,web,tour_community_chat \
+  --db_host=db --db_user=odoo --db_password="$P" --stop-after-init
+
+# 8. The extra Python package the image is missing
 sudo docker compose exec -T tour pip install --break-system-packages qifparse
 sudo docker compose restart tour
 ```
 
-## The two traps, written down because they cost an evening
+Open `http://<machine-ip>:8069`, sign in with `admin` and your generated admin
+password. From the home page, click **Apps** (top-left grid) for the tower's
+own launcher.
 
-### 1. Safety that bites its own tail
+## The traps, written down because they cost an evening
 
-The published image sets `list_db = False` so nobody can enumerate the
-databases. Sensible. But Odoo answers *"which database do I open?"* by reading
-that same list. With the list disabled it finds nothing, gives up, and shows
-the database selector — the exact screen the setting was meant to avoid.
+**1. Safety that bites its own tail.** The image sets `list_db = False`, so
+Odoo cannot resolve *which* database to open and falls back to the selector.
+Fix: name the database on the command line (`--database`) or via `dbfilter`,
+with `list_db = True`.
 
-**Fix:** name the database on the command line — `--database=tour_azure`
-together with `--no-database-list`. Setting `dbfilter` alone is not enough.
+**2. One missing package breaks every page.** Without `qifparse`, every request
+returns 500. Step 8 installs it. To bake it in permanently, add it to the
+image (`requirements-extra.txt`).
 
-### 2. One missing Python package breaks every page
-
-Without `qifparse`, every request returns 500 with
-`ModuleNotFoundError: No module named 'qifparse'`. One of the accounting
-modules imports it. It is listed in `requirements-extra.txt`.
-
-### 3. Known: some modules ship without their `models` folder
-
-In the image published on ghcr, 15 of 20 modules declare
-`from . import models` but the folder is absent — the publish workflow last
-failed on 29 August, so the registry still serves a build from before those
-files were added. Installing them raises what looks like a circular import but
-is really a missing file.
-
-**Workaround used here:** mount the addons from a known-good checkout instead
-of relying on the image's copy. The compose file above does exactly that with
-`./custom-addons:/mnt/extra-addons:ro`.
+**3. Some modules ship without their `models` folder** in the image published
+on ghcr — the publish workflow last failed on 29 August. Mounting the modules
+from the tour-community checkout (step 3) sidesteps the stale image entirely.
 
 ## Honest limits
 
-This deployment runs over plain HTTP with a demo account. It carries **no
-personal data** — it is a copy of a test database. Do not put anything real
-behind an unencrypted login.
+Plain HTTP, a demo `admin`/`admin` account, no personal data — a test database.
+Do not put anything real behind an unencrypted login.

@@ -39,13 +39,13 @@ services:
       - "--db_port=5432"
       - "--db_user=odoo"
       - "--db_password=${POSTGRES_PASSWORD}"
-      - "--database=tour_azure"
-      - "--db-filter=^tour_azure$$"
+      - "--database=tour_prod"
+      - "--db-filter=^tour_prod$$"
       - "--no-database-list"
     depends_on:
       - db
     environment:
-      DB_NAME: tour_azure
+      DB_NAME: tour_prod
       ODOO_DB_HOST: db
       ODOO_DB_PORT: "5432"
       ODOO_DB_USER: odoo
